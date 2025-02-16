@@ -10,14 +10,17 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/showwin/speedtest-go/speedtest"
+	"github.com/showwin/speedtest-go/speedtest/transport"
 
 	"github.com/influxdata/influxdb/client/v2"
 )
 
 type Result struct {
-	Latency  time.Duration
-	Download speedtest.ByteRate
-	Upload   speedtest.ByteRate
+	Latency    time.Duration
+	Download   speedtest.ByteRate
+	Upload     speedtest.ByteRate
+	Jitter     time.Duration
+	PacketLoss transport.PLoss
 }
 
 func runSpeedtest(conf *Config) {
@@ -37,8 +40,8 @@ func runSpeedtest(conf *Config) {
 		s.UploadTest()
 
 		// Note: The unit of s.DLSpeed, s.ULSpeed is bytes per second, this is a float64.
-		log.Printf("Latency: %s, Download: %s, Upload: %s", s.Latency, s.DLSpeed, s.ULSpeed)
-		results = append(results, Result{Latency: s.Latency, Download: s.DLSpeed, Upload: s.ULSpeed})
+		log.Printf("latency: %s, download: %s, upload: %s, jitter: %s", s.Latency, s.DLSpeed, s.ULSpeed, s.Jitter)
+		results = append(results, Result{Latency: s.Latency, Download: s.DLSpeed, Upload: s.ULSpeed, Jitter: s.Jitter, PacketLoss: s.PacketLoss})
 		s.Context.Reset() // reset counter
 	}
 
@@ -72,9 +75,11 @@ func writeToDb(conf *Config, results []Result) {
 	for _, res := range results {
 		tags := map[string]string{"speedtest": "results"}
 		fields := map[string]interface{}{
-			"download": res.Download.Mbps(),
-			"upload":   res.Upload.Mbps(),
-			"latency":  res.Latency.Milliseconds(),
+			"download":   res.Download.Mbps(),
+			"upload":     res.Upload.Mbps(),
+			"latency":    res.Latency.Milliseconds(),
+			"jitter":     res.Jitter.Milliseconds(),
+			"packetLoss": res.PacketLoss.LossPercent(),
 		}
 
 		pt, err := client.NewPoint("speedtest", tags, fields, time.Now())

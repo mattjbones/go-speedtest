@@ -79,7 +79,7 @@ func writeToDb(conf *Config, results []Result) {
 			"upload":     res.Upload.Mbps(),
 			"latency":    res.Latency.Milliseconds(),
 			"jitter":     res.Jitter.Milliseconds(),
-			"packetLoss": res.PacketLoss.LossPercent(),
+			"packetLoss": res.PacketLoss.Loss(),
 		}
 
 		pt, err := client.NewPoint("speedtest", tags, fields, time.Now())

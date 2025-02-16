@@ -72,9 +72,9 @@ func writeToDb(conf *Config, results []Result) {
 	for _, res := range results {
 		tags := map[string]string{"speedtest": "results"}
 		fields := map[string]interface{}{
-			"download": res.Download,
-			"upload":   res.Upload,
-			"latency":  res.Latency,
+			"download": res.Download.Mbps(),
+			"upload":   res.Upload.Mbps(),
+			"latency":  res.Latency.Milliseconds(),
 		}
 
 		pt, err := client.NewPoint("speedtest", tags, fields, time.Now())

@@ -24,4 +24,4 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: mbarnettjones/go-speedtest:latest
+          tags: mbarnettjones/speedtest:latest

@@ -1,10 +1,451 @@
-version: '3.3'
 services:
   speedtest-go:
     environment:
       - POLLING_INTERVAL=30m
-      - DB_URL=[FILL_ME]
+      - DB_URL=http://influx:8086
       - DB_DATABASE=speedtest
       - SPEEDTEST_LOCATION=london
     image: mbarnettjones/speedtest:latest
     restart: unless-stopped
+    depends_on:
+      influx-setup:
+        condition: service_started
+
+  influx: 
+    image: influxdb:1.8.10
+    ports: 
+      - 8086:8086
+    healthcheck:
+      test: ["CMD", "curl", "http://influx:8086/ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  influx-setup:
+    image: busybox:1.37.0 
+    command: wget --post-data 'q=CREATE DATABASE "speedtest"' 'http://influx:8086/query' 
+    depends_on: 
+      influx: 
+        condition: service_healthy 
+
+  grafana: 
+    image: grafana/grafana-oss
+    restart: unless-stopped
+
+    ports: 
+      - 3000:3000
+
+    configs: 
+      - source: influx-config
+        target: /etc/grafana/provisioning/datasources/influx.yml  
+      - source: dashboard-config
+        target: /etc/grafana/provisioning/dashboards/dashy.yml  
+      - source: dashboard-speedtest
+        target: /etc/grafana/provisioning/dashboards/speedtest.json  
+
+configs:
+  dashboard-config: 
+    content: |
+      apiVersion: 1
+      providers: 
+        - name: 'Metrics'
+          updateIntervalSeconds: 10
+          allowUiUpdates: true
+          options:
+            path: /etc/grafana/provisioning/dashboards/
+            foldersFromFilesStructure: true
+          type: file
+
+  influx-config: 
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: InfluxDB-speedtest
+          type: influxdb
+          # access: proxy
+          # user: grafana
+          url: http://influx:8086
+          jsonData:
+            dbName: speedtest
+            httpMode: GET
+          # secureJsonData:
+          #   password: grafana
+
+  dashboard-speedtest: 
+    content: |
+      {
+        "annotations": {
+          "list": [
+            {
+              "builtIn": 1,
+              "datasource": {
+                "type": "grafana",
+                "uid": "-- Grafana --"
+              },
+              "enable": true,
+              "hide": true,
+              "iconColor": "rgba(0, 211, 255, 1)",
+              "name": "Annotations & Alerts",
+              "type": "dashboard"
+            }
+          ]
+        },
+        "editable": true,
+        "fiscalYearStartMonth": 0,
+        "graphTooltip": 0,
+        "id": 1,
+        "links": [],
+        "panels": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P2B07E70E1155008A"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 0,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            },
+            "id": 1,
+            "options": {
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "datasource": {
+                  "type": "influxdb",
+                  "uid": "P2B07E70E1155008A"
+                },
+                "groupBy": [
+                  {
+                    "params": [
+                      "$$__interval"
+                    ],
+                    "type": "time"
+                  },
+                  {
+                    "params": [
+                      "null"
+                    ],
+                    "type": "fill"
+                  }
+                ],
+                "measurement": "speedtest",
+                "orderByTime": "ASC",
+                "policy": "default",
+                "refId": "Download /Mbps",
+                "resultFormat": "time_series",
+                "select": [
+                  [
+                    {
+                      "params": [
+                        "download"
+                      ],
+                      "type": "field"
+                    },
+                    {
+                      "params": [],
+                      "type": "last"
+                    }
+                  ]
+                ],
+                "tags": []
+              },
+              {
+                "datasource": {
+                  "type": "influxdb",
+                  "uid": "P2B07E70E1155008A"
+                },
+                "groupBy": [
+                  {
+                    "params": [
+                      "$$__interval"
+                    ],
+                    "type": "time"
+                  },
+                  {
+                    "params": [
+                      "null"
+                    ],
+                    "type": "fill"
+                  }
+                ],
+                "hide": false,
+                "measurement": "speedtest",
+                "orderByTime": "ASC",
+                "policy": "default",
+                "refId": "Upload /Mbps",
+                "resultFormat": "time_series",
+                "select": [
+                  [
+                    {
+                      "params": [
+                        "upload"
+                      ],
+                      "type": "field"
+                    },
+                    {
+                      "params": [],
+                      "type": "last"
+                    }
+                  ]
+                ],
+                "tags": []
+              }
+            ],
+            "title": "Bandwidth",
+            "type": "timeseries"
+          },
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "P2B07E70E1155008A"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 0,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            },
+            "id": 2,
+            "options": {
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "groupBy": [
+                  {
+                    "params": [
+                      "$$__interval"
+                    ],
+                    "type": "time"
+                  },
+                  {
+                    "params": [
+                      "null"
+                    ],
+                    "type": "fill"
+                  }
+                ],
+                "measurement": "speedtest",
+                "orderByTime": "ASC",
+                "policy": "default",
+                "refId": "Jitter /ms",
+                "resultFormat": "time_series",
+                "select": [
+                  [
+                    {
+                      "params": [
+                        "jitter"
+                      ],
+                      "type": "field"
+                    },
+                    {
+                      "params": [],
+                      "type": "last"
+                    }
+                  ]
+                ],
+                "tags": []
+              },
+              {
+                "datasource": {
+                  "type": "influxdb",
+                  "uid": "P2B07E70E1155008A"
+                },
+                "groupBy": [
+                  {
+                    "params": [
+                      "$$__interval"
+                    ],
+                    "type": "time"
+                  },
+                  {
+                    "params": [
+                      "null"
+                    ],
+                    "type": "fill"
+                  }
+                ],
+                "hide": false,
+                "measurement": "speedtest",
+                "orderByTime": "ASC",
+                "policy": "default",
+                "refId": "Latency /ms",
+                "resultFormat": "time_series",
+                "select": [
+                  [
+                    {
+                      "params": [
+                        "latency"
+                      ],
+                      "type": "field"
+                    },
+                    {
+                      "params": [],
+                      "type": "last"
+                    }
+                  ]
+                ],
+                "tags": []
+              }
+            ],
+            "title": "Performance",
+            "type": "timeseries"
+          }
+        ],
+        "preload": false,
+        "refresh": "",
+        "schemaVersion": 40,
+        "tags": [],
+        "templating": {
+          "list": []
+        },
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "timepicker": {},
+        "timezone": "browser",
+        "title": "Speedtest",
+        "uid": "dedy88z080u0wc",
+        "version": 2,
+        "weekStart": ""
+      }
+
+
+

@@ -1,0 +1,10 @@
+version: '3.3'
+services:
+  speedtest-go:
+    environment:
+      - POLLING_INTERVAL=30m
+      - DB_URL=[FILL_ME]
+      - DB_DATABASE=speedtest
+      - SPEEDTEST_LOCATION=london
+    image: mbarnettjones/speedtest:latest
+    restart: unless-stopped
